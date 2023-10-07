@@ -6,20 +6,28 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model Video {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid()) @db.Uuid
   name          String
   path          String
   transcription String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime    @default(now())
+  Thumbnail     Thumbnail[]
 }
 
 model Prompt {
   id       String @id @default(uuid())
   title    String
   template String
+}
+
+model Thumbnail {
+  id             String @id @default(uuid())
+  frameImagePath String
+  videoId        String @unique @map("video_id") @db.Uuid
+  video          Video  @relation(fields: [videoId], references: [id])
 }

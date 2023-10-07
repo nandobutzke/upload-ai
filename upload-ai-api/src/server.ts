@@ -4,18 +4,31 @@ import { getAllPromptsRoute } from "./routes/get-all-prompts";
 import { uploadVideoRoute } from "./routes/upload-video";
 import { createTranscriptionRoute } from "./routes/create-transcription";
 import { generateAICompletionRoute } from "./routes/generate-ai-completion";
+import { getAllVideosRoute } from "./routes/get-all-videos";
+import { getVideoByIdRoute } from "./routes/get-video-by-id";
+import path from "node:path";
+import fastifyStatic from '@fastify/static';
 
 const app = fastify();
 
 app.register(fastifyCors, {
-    origin: '*',
+  origin: '*',
+});
+
+console.log({ path: path.join(__dirname, '../tmp') })
+
+app.register(require('@fastify/static'), {
+  root: path.join(__dirname, '../tmp'),
+  prefix: '/tmp/',
 });
 
 app.register(getAllPromptsRoute);
+app.register(getAllVideosRoute);
+app.register(getVideoByIdRoute);
 app.register(uploadVideoRoute);
 app.register(createTranscriptionRoute);
 app.register(generateAICompletionRoute);
 
 app.listen({
-    port: 3333,
+  port: 3333,
 }).then(() => console.log('Server started at port 3333!'));

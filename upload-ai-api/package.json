@@ -20,8 +20,10 @@
   "dependencies": {
     "@fastify/cors": "^8.3.0",
     "@fastify/multipart": "^7.7.3",
+    "@fastify/static": "6.11.2",
     "ai": "^2.2.12",
     "fastify": "^4.23.2",
+    "fluent-ffmpeg": "^2.1.2",
     "openai": "^4.7.0",
     "zod": "^3.22.2"
   }

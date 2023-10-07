@@ -9,10 +9,13 @@ import { Slider } from "./components/ui/slider";
 import VideoInputForm from "./components/video-input-form";
 import PromptSelect from "./components/prompt-select";
 import { useCompletion } from 'ai/react';
+import { UploadFileProvider } from "./hooks/useUploadFile";
 
 export function App() {
   const [videoId, setVideoId] = useState<string>('');
   const [temperature, setTemperature] = useState(0.5);
+
+  console.log({ videoId })
 
   const {
     input,
@@ -72,7 +75,10 @@ export function App() {
         </div>
 
         <aside className="w-80 space-y-6">
-          <VideoInputForm onVideoUploaded={setVideoId} />
+
+          <UploadFileProvider onVideoUploaded={setVideoId}>
+            <VideoInputForm />
+          </UploadFileProvider>
 
           <Separator />
 

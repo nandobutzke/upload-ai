@@ -4,6 +4,18 @@ GET http://localhost:3333/prompts
 
 ###
 
+# @name get-all-videos
+
+GET http://localhost:3333/videos
+
+###
+
+# @name get-video-by-id
+
+GET http://localhost:3333/videos/b4f9832b-19cd-432b-80fe-9e968cc2a18b
+
+###
+
 # @name upload-video
 POST http://localhost:3333/videos
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
