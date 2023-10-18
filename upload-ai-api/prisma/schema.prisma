@@ -14,15 +14,20 @@ model Video {
   id            String      @id @default(uuid()) @db.Uuid
   name          String
   path          String
+  prompt        String?
   transcription String?
   createdAt     DateTime    @default(now())
-  Thumbnail     Thumbnail[]
+  thumbnail     Thumbnail[]
+
+  @@map("video")
 }
 
 model Prompt {
   id       String @id @default(uuid())
   title    String
   template String
+
+  @@map("prompt")
 }
 
 model Thumbnail {
@@ -30,4 +35,6 @@ model Thumbnail {
   frameImagePath String
   videoId        String @unique @map("video_id") @db.Uuid
   video          Video  @relation(fields: [videoId], references: [id])
+
+  @@map("thumbnail")
 }

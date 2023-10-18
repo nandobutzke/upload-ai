@@ -12,11 +12,14 @@ type Status = 'waiting' | 'converting' | 'uploading' | 'generating' | 'success';
 
 type UploadFileContextType = {
   previewUrl: string | undefined;
+  handleCancelUpload: () => void;
   imagePreviewFromDatabase: string;
   handleSelectedFile: (event: ChangeEvent<HTMLInputElement>) => void;
   handleUploadVideo: (event: FormEvent<HTMLFormElement>) => void;
+  handleTranscriptionPromptChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   handleSelectAudioFileFromDatabase: (audioFileId: string) => void;
   status: Status;
+  transcriptionPrompt: string;
   statusMessages: {
     converting: string,
     uploading: string,
@@ -38,6 +41,7 @@ const statusMessages = {
 export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProviderProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>('waiting');
+  const [transcriptionPrompt, setTranscriptionPrompt] = useState<string>('');
   const [imagePreviewFromDatabase, setImagePreviewFromDatabase] = useState<string>('');
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
@@ -107,12 +111,16 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
   async function handleSelectAudioFileFromDatabase(audioFileId: string) {
     const { data } = await api.get(`/videos/${audioFileId}`);
 
-    console.log({ data })
+    const { id, prompt, thumbnail } = data;
 
-    const previewImage = data.Thumbnail[0].frameImagePath.split("\\tmp\\");
+    console.log({ id, prompt })
+
+    const previewImage = thumbnail[0].frameImagePath.split("\\tmp\\");
 
     setImagePreviewFromDatabase(previewImage[1]);
-    onVideoUploaded(data.id);
+    setTranscriptionPrompt(prompt);
+    onVideoUploaded(id);
+    setStatus('success');
   }
 
   async function handleUploadVideo(event: FormEvent<HTMLFormElement>) {
@@ -127,6 +135,8 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
     setStatus('converting');
 
     const { audioFile, frameImageFile } = await convertVideoToAudio(videoFile);
+
+    console.log({ audioFile, frameImageFile })
 
     setStatus('uploading');
 
@@ -154,6 +164,21 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
     }
   }
 
+  function handleCancelUpload() {
+    setImagePreviewFromDatabase('');
+    onVideoUploaded('');
+    setTranscriptionPrompt('');
+    setStatus('waiting');
+  }
+
+  function handleTranscriptionPromptChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    if (!event.target.value) {
+      setTranscriptionPrompt('');
+    } else {
+      setTranscriptionPrompt(event.target.value);
+    }
+  }
+
   const previewUrl = useMemo(() => {
     if (!videoFile) {
       return undefined;
@@ -162,15 +187,17 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
     return URL.createObjectURL(videoFile);
   }, [videoFile]);
 
-
   return (
     <UploadFileContext.Provider value={{
       previewUrl,
+      handleCancelUpload,
       imagePreviewFromDatabase,
       handleSelectedFile,
       handleUploadVideo,
       handleSelectAudioFileFromDatabase,
+      handleTranscriptionPromptChange,
       status,
+      transcriptionPrompt,
       statusMessages,
       promptInputRef
     }}>

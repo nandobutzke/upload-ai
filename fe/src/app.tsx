@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Button } from './components/ui/button';
+import { Button } from './components/shadcn/ui/Button';
 import { Github, Wand2 } from 'lucide-react';
-import { Separator } from './components/ui/separator';
-import { Textarea } from "./components/ui/textarea";
-import { Label } from "./components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
-import { Slider } from "./components/ui/slider";
+import { Separator } from './components/shadcn/ui/Separator';
+import { Textarea } from "./components/shadcn/ui/Textarea";
+import { Label } from "./components/shadcn/ui/Label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/shadcn/ui/Select";
+import { Slider } from "./components/shadcn/ui/Slider";
 import VideoInputForm from "./components/video-input-form";
 import PromptSelect from "./components/prompt-select";
 import { useCompletion } from 'ai/react';
@@ -14,8 +14,6 @@ import { UploadFileProvider } from "./hooks/useUploadFile";
 export function App() {
   const [videoId, setVideoId] = useState<string>('');
   const [temperature, setTemperature] = useState(0.5);
-
-  console.log({ videoId })
 
   const {
     input,

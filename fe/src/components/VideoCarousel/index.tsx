@@ -1,6 +1,5 @@
 import { api } from "@/lib/axios";
 import { useCallback, useEffect, useState } from "react";
-import testImage from '../../assets/img/teste.jpg';
 import { Carousel } from "@material-tailwind/react";
 import useUploadFile from "@/hooks/useUploadFile";
 
@@ -8,7 +7,7 @@ interface Video {
   id: string;
   name: string;
   path: string;
-  Thumbnail: {
+  thumbnail: {
     frameImagePath: string;
   }[];
   transcription?: string;
@@ -32,7 +31,7 @@ export function VideoCarousel() {
   return (
     <Carousel className="rounded-sm">
       {videos?.map(video => {
-        const [, frameImagePath] = video.Thumbnail[0].frameImagePath.split("\\tmp\\");
+        const [, frameImagePath] = video.thumbnail[0].frameImagePath.split("\\tmp\\");
 
         return (
           <img

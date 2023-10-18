@@ -7,15 +7,12 @@ import { generateAICompletionRoute } from "./routes/generate-ai-completion";
 import { getAllVideosRoute } from "./routes/get-all-videos";
 import { getVideoByIdRoute } from "./routes/get-video-by-id";
 import path from "node:path";
-import fastifyStatic from '@fastify/static';
 
 const app = fastify();
 
 app.register(fastifyCors, {
   origin: '*',
 });
-
-console.log({ path: path.join(__dirname, '../tmp') })
 
 app.register(require('@fastify/static'), {
   root: path.join(__dirname, '../tmp'),

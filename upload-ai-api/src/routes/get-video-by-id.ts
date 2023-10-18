@@ -14,7 +14,8 @@ export async function getVideoByIdRoute(app: FastifyInstance) {
       where: { id: videoId },
       select: {
         id: true,
-        Thumbnail: {
+        prompt: true,
+        thumbnail: {
           select: {
             frameImagePath: true,
           }

@@ -5,7 +5,7 @@ export async function getAllVideosRoute(app: FastifyInstance) {
   app.get('/videos', async () => {
     const videos = await prisma.video.findMany({
       include: {
-        Thumbnail: {
+        thumbnail: {
           select: {
             frameImagePath: true,
           }
