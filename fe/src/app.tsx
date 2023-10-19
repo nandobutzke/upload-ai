@@ -6,8 +6,8 @@ import { Textarea } from "./components/shadcn/ui/Textarea";
 import { Label } from "./components/shadcn/ui/Label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/shadcn/ui/Select";
 import { Slider } from "./components/shadcn/ui/Slider";
-import VideoInputForm from "./components/video-input-form";
-import PromptSelect from "./components/prompt-select";
+import VideoInputForm from "./components/VideoInputForm";
+import PromptSelect from "./components/PromptSelect";
 import { useCompletion } from 'ai/react';
 import { UploadFileProvider } from "./hooks/useUploadFile";
 

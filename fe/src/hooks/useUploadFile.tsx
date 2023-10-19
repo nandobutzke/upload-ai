@@ -73,7 +73,7 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
       '-i',
       'input.mp4',
       '-ss',
-      '00:00:05',
+      '00:00:01',
       '-vframes',
       '1',
       'frame.jpg'
@@ -113,12 +113,11 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
 
     const { id, prompt, thumbnail } = data;
 
-    console.log({ id, prompt })
-
     const previewImage = thumbnail[0].frameImagePath.split("\\tmp\\");
 
     setImagePreviewFromDatabase(previewImage[1]);
     setTranscriptionPrompt(prompt);
+    setVideoFile(null);
     onVideoUploaded(id);
     setStatus('success');
   }
@@ -167,6 +166,7 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
   function handleCancelUpload() {
     setImagePreviewFromDatabase('');
     onVideoUploaded('');
+    setVideoFile(null);
     setTranscriptionPrompt('');
     setStatus('waiting');
   }

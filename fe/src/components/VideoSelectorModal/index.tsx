@@ -3,7 +3,6 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { FileVideo } from "lucide-react";
 import { VideoCarousel } from "../VideoCarousel";
 import useUploadFile from "@/hooks/useUploadFile";
-import { Separator } from '../shadcn/ui/Separator';
 import { Button } from "../shadcn/ui/Button";
 
 export function VideoSelectorModal() {
@@ -36,7 +35,11 @@ export function VideoSelectorModal() {
         </DialogHeader>
         {imagePreviewFromDatabase !== ''
           ? (
-            <img src={`http://localhost:3333/tmp/${imagePreviewFromDatabase}`} className="h-full w-full object-fill aspect-video" alt="Thumbnail do vídeo" />
+            <label htmlFor="video" className="relative w-full h-full border flex aspect-video rounded-md cursor-pointer border-dashed text-lg flex-col gap-2 items-center justify-center text-muted-foreground hover:bg-primary/5">
+              <img src={`http://localhost:3333/tmp/${imagePreviewFromDatabase}`} className="h-full w-full object-fill aspect-video" alt="Thumbnail do vídeo" />
+
+              <input type="file" id="video" accept="video/mp4" className="sr-only cursor-pointer w-full h-full z-10" onChange={handleSelectedFile} />
+            </label>
           )
           : (
             <>
@@ -56,9 +59,6 @@ export function VideoSelectorModal() {
               <input type="file" id="video" accept="video/mp4" className="sr-only" onChange={handleSelectedFile} />
             </>
           )}
-
-        <Separator />
-
         <VideoCarousel />
         <DialogFooter className="self-end">
           <DialogClose asChild>

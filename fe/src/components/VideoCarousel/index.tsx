@@ -1,48 +1,47 @@
 import { api } from "@/lib/axios";
 import { useCallback, useEffect, useState } from "react";
 import { Carousel } from "@material-tailwind/react";
-import useUploadFile from "@/hooks/useUploadFile";
-
-interface Video {
-  id: string;
-  name: string;
-  path: string;
-  thumbnail: {
-    frameImagePath: string;
-  }[];
-  transcription?: string;
-}
+import { Separator } from "../shadcn/ui/Separator";
+import { CarouselItem } from "./CarouselItem";
+import { Video } from "@/types/Video";
 
 export function VideoCarousel() {
-  const [videos, setVideos] = useState<Video[] | null>([]);
-
-  const { handleSelectAudioFileFromDatabase } = useUploadFile();
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [selectedVideoId, setSelectedVideoId] = useState<string>('');
 
   const loadVideos = useCallback(async () => {
-    const response = await api.get('/videos');
+    const { data } = await api.get('/videos');
 
-    setVideos(response.data);
+    setVideos(data);
   }, [])
 
   useEffect(() => {
     loadVideos();
   }, [loadVideos])
 
-  return (
-    <Carousel className="rounded-sm">
-      {videos?.map(video => {
-        const [, frameImagePath] = video.thumbnail[0].frameImagePath.split("\\tmp\\");
+  function handleSelectVideo(id: string) {
+    setSelectedVideoId(id);
+  }
 
-        return (
-          <img
-            key={video.id}
-            src={`http://localhost:3333/tmp/${frameImagePath}`}
-            alt="image 1"
-            className="h-full w-full object-cover rounded-sm aspect-video cursor-pointer hover:scale-90 hover:border- transition duration-200"
-            onClick={() => handleSelectAudioFileFromDatabase(video.id)}
-          />
-        )
-      })}
-    </Carousel>
+  return (
+    <>
+      {videos.length > 0 && <Separator />}
+
+      <Carousel className="rounded-sm">
+        {videos?.map(video => {
+          const [, frameImagePath] = video.thumbnail[0].frameImagePath.split("\\tmp\\");
+
+          return (
+            <CarouselItem
+              key={video.id}
+              id={video.id}
+              isSelected={selectedVideoId === video.id}
+              onSelectVideo={() => handleSelectVideo(video.id)}
+              frameImagePath={frameImagePath}
+            />
+          )
+        })}
+      </Carousel>
+    </>
   );
 }
