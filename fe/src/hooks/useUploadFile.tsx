@@ -73,7 +73,7 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
       '-i',
       'input.mp4',
       '-ss',
-      '00:00:01',
+      '00:00:02',
       '-vframes',
       '1',
       'frame.jpg'
@@ -144,6 +144,8 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
     data.append('audio', audioFile);
     data.append('frameImageFile', frameImageFile);
 
+    console.log({ frameImageFile })
+
     try {
       const response = await api.post('/videos', data);
 
@@ -180,6 +182,11 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
   }
 
   const previewUrl = useMemo(() => {
+    setImagePreviewFromDatabase('');
+    onVideoUploaded('');
+    setTranscriptionPrompt('');
+    setStatus('waiting');
+
     if (!videoFile) {
       return undefined;
     }

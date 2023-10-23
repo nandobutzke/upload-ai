@@ -8,7 +8,7 @@ interface CarouselItemProps {
 }
 
 export function CarouselItem({ id, frameImagePath, isSelected, onSelectVideo }: CarouselItemProps) {
-  const { handleSelectAudioFileFromDatabase } = useUploadFile();
+  const { handleSelectAudioFileFromDatabase, imagePreviewFromDatabase } = useUploadFile();
 
   function handleItemClick() {
     handleSelectAudioFileFromDatabase(id);
@@ -20,7 +20,7 @@ export function CarouselItem({ id, frameImagePath, isSelected, onSelectVideo }: 
       src={`http://localhost:3333/tmp/${frameImagePath}`}
       alt="image 1"
       onClick={handleItemClick}
-      data-selected={isSelected === true}
+      data-selected={isSelected === true && imagePreviewFromDatabase !== ''}
       className="h-full w-full object-cover rounded-sm aspect-video cursor-pointer hover:scale-90 transition duration-200 data-[selected=true]:border-white data-[selected=true]:border-2"
     />
   );
