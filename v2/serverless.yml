@@ -1,0 +1,150 @@
+service: upload-ai
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  timeout: 15
+  environment:
+    BUCKET_NAME: ${self:custom.bucketName}
+    MODEL_ID: us.amazon.nova-lite-v1:0
+  httpApi:
+    cors:
+      allowedOrigins:
+        - http://localhost:5173
+      allowedHeaders:
+        - Content-Type
+      allowedMethods:
+        - GET
+        - POST
+        - OPTIONS
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource:
+            - arn:aws:s3:::${self:custom.bucketName}/uploads/*
+            - arn:aws:s3:::${self:custom.bucketName}/transcripts/*
+        - Effect: Allow
+          Action:
+            - s3:GetBucketLocation
+          Resource:
+            - arn:aws:s3:::${self:custom.bucketName}
+        - Effect: Allow
+          Action:
+            - transcribe:StartTranscriptionJob
+            - transcribe:GetTranscriptionJob
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+          Resource:
+            # us.amazon.nova-lite-v1:0 is a cross-region inference profile.
+            # InvokeModel needs the profile and the foundation model it routes to.
+            - arn:aws:bedrock:${aws:region}:${aws:accountId}:inference-profile/us.amazon.nova-lite-v1:0
+            - arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0
+  # Built-in S3 event owns the bucket and the object-created notification.
+  # NotificationConfiguration is not set on a separate bucket resource, so the
+  # Lambda permission and the bucket notification do not form a CloudFormation cycle.
+  # CORS, lifecycle and public access are properties of that same bucket.
+  s3:
+    media:
+      name: ${self:custom.bucketName}
+      publicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      corsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - Content-Type
+            AllowedMethods:
+              - PUT
+            AllowedOrigins:
+              - http://localhost:5173
+      lifecycleConfiguration:
+        Rules:
+          - Id: ExpireAllObjectsAfterOneDay
+            Status: Enabled
+            ExpirationInDays: 1
+            Prefix: ''
+
+functions:
+  createUpload:
+    handler: src/createUpload.handler
+    events:
+      - httpApi:
+          method: POST
+          path: /uploads
+
+  startTranscription:
+    handler: src/startTranscription.handler
+    events:
+      - s3:
+          bucket: media
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .mp4
+
+  getTranscription:
+    handler: src/getTranscription.handler
+    events:
+      - httpApi:
+          method: GET
+          path: /transcriptions/{id}
+
+  generateCopy:
+    handler: src/generateCopy.handler
+    # HTTP API cuts the request at 30s. Stay under that so a finished
+    # invocation is still able to return title and description.
+    timeout: 29
+    events:
+      - httpApi:
+          method: POST
+          path: /generations
+
+custom:
+  bucketName: upload-ai-${sls:stage}-${aws:accountId}
+
+resources:
+  Resources:
+    # Depends on the framework bucket (logical id S3Bucket + the provider.s3 key).
+    # The policy names the bucket as a string, so without DependsOn CloudFormation
+    # can create it before the bucket exists.
+    TranscribeBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      DependsOn: S3BucketMedia
+      Properties:
+        Bucket: ${self:custom.bucketName}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: TranscribeReadUploads
+              Effect: Allow
+              Principal:
+                Service: transcribe.amazonaws.com
+              Action: s3:GetObject
+              Resource: arn:aws:s3:::${self:custom.bucketName}/uploads/*
+              Condition:
+                StringEquals:
+                  aws:SourceAccount: ${aws:accountId}
+                ArnLike:
+                  aws:SourceArn: arn:aws:transcribe:${aws:region}:${aws:accountId}:*
+            - Sid: TranscribeWriteTranscripts
+              Effect: Allow
+              Principal:
+                Service: transcribe.amazonaws.com
+              Action: s3:PutObject
+              Resource: arn:aws:s3:::${self:custom.bucketName}/transcripts/*
+              Condition:
+                StringEquals:
+                  aws:SourceAccount: ${aws:accountId}
+                ArnLike:
+                  aws:SourceArn: arn:aws:transcribe:${aws:region}:${aws:accountId}:*

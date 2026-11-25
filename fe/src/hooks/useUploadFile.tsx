@@ -1,212 +1,320 @@
 import { api } from "@/lib/axios";
-import { loadFFmpeg } from "@/lib/ffmpeg";
-import { fetchFile } from '@ffmpeg/util';
-import { ChangeEvent, RefObject, FormEvent, useMemo, createContext, ReactNode, useState, useRef, useContext } from "react";
+import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useRef, useState } from "react";
+
+type Status = 'waiting' | 'uploading' | 'transcribing' | 'completed' | 'failed';
+
+type UploadResponse = {
+  id: string;
+  url: string;
+};
+
+type TranscriptionResponse = {
+  status: 'processing' | 'completed' | 'failed' | string;
+  text?: string;
+};
+
+type GenerationResponse = {
+  title: string;
+  description: string;
+};
+
+type UploadFileContextType = {
+  previewUrl?: string;
+  selectedFileName: string;
+  status: Status;
+  statusLabel: string;
+  errorMessage: string;
+  transcription: string;
+  title: string;
+  description: string;
+  hasGeneration: boolean;
+  isGenerating: boolean;
+  canUpload: boolean;
+  canGenerate: boolean;
+  handleCancelUpload: () => void;
+  handleSelectedFile: (event: ChangeEvent<HTMLInputElement>) => void;
+  handleUploadVideo: (event: FormEvent<HTMLFormElement>) => void;
+  handleGenerate: () => void;
+};
+
+const POLL_INTERVAL_MS = 5000;
+const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+
+const statusLabels: Record<Status, string> = {
+  waiting: 'Aguardando',
+  uploading: 'Enviando',
+  transcribing: 'Transcrevendo',
+  completed: 'Concluído',
+  failed: 'Falhou',
+};
+
+const UploadFileContext = createContext<UploadFileContextType | null>(null);
+
+function isMp4(file: File) {
+  return file.name.toLowerCase().endsWith('.mp4');
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function errorText(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message && !('isAxiosError' in error)) {
+    return error.message;
+  }
+
+  return fallback;
+}
 
 interface UploadFileProviderProps {
   children: ReactNode;
-  onVideoUploaded: (videoId: string) => void;
 }
 
-type Status = 'waiting' | 'converting' | 'uploading' | 'generating' | 'success';
-
-type UploadFileContextType = {
-  previewUrl: string | undefined;
-  handleCancelUpload: () => void;
-  imagePreviewFromDatabase: string;
-  handleSelectedFile: (event: ChangeEvent<HTMLInputElement>) => void;
-  handleUploadVideo: (event: FormEvent<HTMLFormElement>) => void;
-  handleTranscriptionPromptChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
-  handleSelectAudioFileFromDatabase: (audioFileId: string) => void;
-  status: Status;
-  transcriptionPrompt: string;
-  statusMessages: {
-    converting: string,
-    uploading: string,
-    generating: string,
-    success: string,
-  };
-  promptInputRef: RefObject<HTMLTextAreaElement>
-}
-
-const UploadFileContext = createContext<UploadFileContextType>({} as UploadFileContextType);
-
-const statusMessages = {
-  converting: 'Convertendo...',
-  uploading: 'Transcrevendo...',
-  generating: 'Carregando...',
-  success: 'Sucesso!',
-}
-
-export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProviderProps) {
+export function UploadFileProvider({ children }: UploadFileProviderProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>();
+  const [uploadId, setUploadId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('waiting');
-  const [transcriptionPrompt, setTranscriptionPrompt] = useState<string>('');
-  const [imagePreviewFromDatabase, setImagePreviewFromDatabase] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [transcription, setTranscription] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [hasGeneration, setHasGeneration] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const promptInputRef = useRef<HTMLTextAreaElement>(null);
+  const runIdRef = useRef(0);
+  const busyRef = useRef(false);
 
-  async function convertVideoToAudio(video: File) {
-    console.log('Convert started');
-
-    const ffmpeg = await loadFFmpeg();
-
-    await ffmpeg.writeFile('input.mp4', await fetchFile(video));
-
-    ffmpeg.on('progress', progress => {
-      console.log('Convert progress: ' + Math.round(progress.progress * 100));
-    });
-
-    await ffmpeg.exec([
-      '-i',
-      'input.mp4',
-      '-b:a',
-      '20k',
-      '-acodec',
-      'libmp3lame',
-      'output.mp3',
-      '-vf',
-      'select=gte(n\\,1),scale=320:240,tile=1x1:0:0,setsar=sar=1'
-    ]);
-
-    await ffmpeg.exec([
-      '-i',
-      'input.mp4',
-      '-ss',
-      '00:00:02',
-      '-vframes',
-      '1',
-      'frame.jpg'
-    ]);
-
-    const audioData = await ffmpeg.readFile('output.mp3');
-    const audioFileBlob = new Blob([audioData], { type: 'audio/mpeg' });
-    const audioFile = new File([audioFileBlob], 'audio.mp3', {
-      type: 'audio/mpeg'
-    });
-
-    const frameImageBlob = await ffmpeg.readFile('frame.jpg');
-    const frameImageFileBlob = new Blob([frameImageBlob], { type: 'image/jpeg' });
-    const frameImageFile = new File([frameImageFileBlob], 'frame.jpg', {
-      type: 'image/jpeg'
-    });
-
-    console.log('Convert finished', frameImageFile);
-
-    return { audioFile, frameImageFile };
-  }
-
-  function handleSelectedFile(event: ChangeEvent<HTMLInputElement>) {
-    const { files } = event.currentTarget;
-
-    if (!files) {
+  useEffect(() => {
+    if (!videoFile) {
+      setPreviewUrl(undefined);
       return;
     }
 
-    const selectedFile = files[0];
+    const url = URL.createObjectURL(videoFile);
+    setPreviewUrl(url);
 
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [videoFile]);
+
+  useEffect(() => {
+    return () => {
+      runIdRef.current += 1;
+    };
+  }, []);
+
+  function clearResult() {
+    setUploadId(null);
+    setTranscription('');
+    setTitle('');
+    setDescription('');
+    setHasGeneration(false);
+    setIsGenerating(false);
+  }
+
+  function handleCancelUpload() {
+    runIdRef.current += 1;
+    busyRef.current = false;
+    setVideoFile(null);
+    clearResult();
+    setStatus('waiting');
+    setErrorMessage('');
+  }
+
+  function handleSelectedFile(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!selectedFile) {
+      return;
+    }
+
+    runIdRef.current += 1;
+    busyRef.current = false;
+    clearResult();
+
+    if (!isMp4(selectedFile)) {
+      setVideoFile(null);
+      setStatus('failed');
+      setErrorMessage('O arquivo precisa ser .mp4.');
+      return;
+    }
+
+    setErrorMessage('');
+    setStatus('waiting');
     setVideoFile(selectedFile);
   }
 
-  async function handleSelectAudioFileFromDatabase(audioFileId: string) {
-    const { data } = await api.get(`/videos/${audioFileId}`);
+  async function pollTranscription(id: string, runId: number) {
+    const deadline = Date.now() + POLL_TIMEOUT_MS;
 
-    const { id, prompt, thumbnail } = data;
+    while (runIdRef.current === runId) {
+      let data: TranscriptionResponse | null = null;
 
-    const previewImage = thumbnail[0].frameImagePath.split("\\tmp\\");
+      try {
+        const response = await api.get<TranscriptionResponse>(`/transcriptions/${id}`);
+        data = response.data;
+      } catch {
+        data = null;
+      }
 
-    setImagePreviewFromDatabase(previewImage[1]);
-    setTranscriptionPrompt(prompt);
-    setVideoFile(null);
-    onVideoUploaded(id);
-    setStatus('success');
+      if (runIdRef.current !== runId) {
+        return null;
+      }
+
+      if (data?.status === 'completed') {
+        return data.text ?? '';
+      }
+
+      if (data?.status === 'failed') {
+        throw new Error('A transcrição falhou.');
+      }
+
+      const remaining = deadline - Date.now();
+
+      if (remaining <= 0) {
+        throw new Error(
+          data
+            ? 'A transcrição excedeu 10 minutos.'
+            : 'Não foi possível consultar a transcrição.'
+        );
+      }
+
+      await wait(Math.min(POLL_INTERVAL_MS, remaining));
+    }
+
+    return null;
   }
 
   async function handleUploadVideo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const prompt = promptInputRef.current?.value;
-
-    if (!videoFile) {
+    if (busyRef.current) {
       return;
     }
 
-    setStatus('converting');
+    if (!videoFile || !isMp4(videoFile)) {
+      setVideoFile(null);
+      setStatus('failed');
+      setErrorMessage('O arquivo precisa ser .mp4.');
+      return;
+    }
 
-    const { audioFile, frameImageFile } = await convertVideoToAudio(videoFile);
-
-    console.log({ audioFile, frameImageFile })
-
+    const runId = ++runIdRef.current;
+    const file = videoFile;
+    busyRef.current = true;
+    clearResult();
+    setErrorMessage('');
     setStatus('uploading');
 
-    const data = new FormData();
-
-    data.append('audio', audioFile);
-    data.append('frameImageFile', frameImageFile);
-
-    console.log({ frameImageFile })
-
     try {
-      const response = await api.post('/videos', data);
+      const { data } = await api.post<UploadResponse>('/uploads');
 
-      const videoId = response.data.video.id;
+      if (runIdRef.current !== runId) {
+        return;
+      }
 
-      setStatus('generating');
-
-      await api.post(`/videos/${videoId}/transcription`, {
-        prompt
+      const putResponse = await fetch(data.url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'video/mp4',
+        },
+        body: file,
       });
 
-      setStatus('success');
+      if (runIdRef.current !== runId) {
+        return;
+      }
 
-      onVideoUploaded(videoId);
+      if (!putResponse.ok) {
+        throw new Error('Não foi possível enviar o vídeo.');
+      }
+
+      setUploadId(data.id);
+      setStatus('transcribing');
+
+      const text = await pollTranscription(data.id, runId);
+
+      if (text === null || runIdRef.current !== runId) {
+        return;
+      }
+
+      setTranscription(text);
+      setStatus('completed');
     } catch (error) {
-      console.error('Error uploading video:', error);
+      if (runIdRef.current !== runId) {
+        return;
+      }
+
+      setStatus('failed');
+      setErrorMessage(errorText(error, 'Não foi possível enviar o vídeo.'));
+    } finally {
+      if (runIdRef.current === runId) {
+        busyRef.current = false;
+      }
     }
   }
 
-  function handleCancelUpload() {
-    setImagePreviewFromDatabase('');
-    onVideoUploaded('');
-    setVideoFile(null);
-    setTranscriptionPrompt('');
-    setStatus('waiting');
-  }
+  async function handleGenerate() {
+    if (status !== 'completed' || !uploadId || isGenerating) {
+      return;
+    }
 
-  function handleTranscriptionPromptChange(event: ChangeEvent<HTMLTextAreaElement>) {
-    if (!event.target.value) {
-      setTranscriptionPrompt('');
-    } else {
-      setTranscriptionPrompt(event.target.value);
+    const runId = runIdRef.current;
+    const id = uploadId;
+    setIsGenerating(true);
+    setErrorMessage('');
+
+    try {
+      const { data } = await api.post<GenerationResponse>('/generations', {
+        id,
+      });
+
+      if (runIdRef.current !== runId) {
+        return;
+      }
+
+      setTitle(data.title);
+      setDescription(data.description);
+      setHasGeneration(true);
+    } catch {
+      if (runIdRef.current !== runId) {
+        return;
+      }
+
+      setErrorMessage('Não foi possível gerar o título e a descrição.');
+    } finally {
+      if (runIdRef.current === runId) {
+        setIsGenerating(false);
+      }
     }
   }
 
-  const previewUrl = useMemo(() => {
-    setImagePreviewFromDatabase('');
-    onVideoUploaded('');
-    setTranscriptionPrompt('');
-    setStatus('waiting');
-
-    if (!videoFile) {
-      return undefined;
-    }
-
-    return URL.createObjectURL(videoFile);
-  }, [videoFile]);
+  const canUpload = Boolean(videoFile) && (status === 'waiting' || status === 'failed');
+  const canGenerate = status === 'completed' && !isGenerating && Boolean(uploadId);
 
   return (
     <UploadFileContext.Provider value={{
       previewUrl,
+      selectedFileName: videoFile?.name ?? '',
+      status,
+      statusLabel: statusLabels[status],
+      errorMessage,
+      transcription,
+      title,
+      description,
+      hasGeneration,
+      isGenerating,
+      canUpload,
+      canGenerate,
       handleCancelUpload,
-      imagePreviewFromDatabase,
       handleSelectedFile,
       handleUploadVideo,
-      handleSelectAudioFileFromDatabase,
-      handleTranscriptionPromptChange,
-      status,
-      transcriptionPrompt,
-      statusMessages,
-      promptInputRef
+      handleGenerate,
     }}>
       {children}
     </UploadFileContext.Provider>
@@ -215,6 +323,10 @@ export function UploadFileProvider({ children, onVideoUploaded }: UploadFileProv
 
 export default function useUploadFile() {
   const context = useContext(UploadFileContext);
+
+  if (!context) {
+    throw new Error('useUploadFile must be used within UploadFileProvider');
+  }
 
   return context;
 }
