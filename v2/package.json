@@ -1,0 +1,17 @@
+{
+  "name": "upload-ai-infra",
+  "private": true,
+  "description": "API de upload, transcrição e geração de título/descrição.",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.940.0",
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@aws-sdk/client-transcribe": "^3.940.0",
+    "@aws-sdk/s3-request-presigner": "^3.940.0"
+  },
+  "devDependencies": {
+    "serverless": "^4.22.0"
+  }
+}

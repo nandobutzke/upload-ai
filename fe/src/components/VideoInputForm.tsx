@@ -1,14 +1,20 @@
 import { Upload } from "lucide-react";
 import { Separator } from './shadcn/ui/Separator';
 import { Label } from "./shadcn/ui/Label";
-import { Textarea } from "./shadcn/ui/Textarea";
 import { Button } from "./shadcn/ui/Button";
 
 import useUploadFile from "@/hooks/useUploadFile";
 import { VideoSelectorModal } from "./VideoSelectorModal";
 
 export default function VideoInputForm() {
-  const { handleUploadVideo, handleTranscriptionPromptChange, status, transcriptionPrompt, statusMessages, promptInputRef } = useUploadFile();
+  const {
+    handleUploadVideo,
+    status,
+    statusLabel,
+    errorMessage,
+    selectedFileName,
+    canUpload,
+  } = useUploadFile();
 
   return (
     <form onSubmit={handleUploadVideo} className="space-y-6">
@@ -17,36 +23,28 @@ export default function VideoInputForm() {
       <Separator />
 
       <div className="space-y-2">
-        <Label
-          htmlFor="transcription_prompt"
-        >
-          Prompt de transcrição
-        </Label>
+        <Label>Arquivo</Label>
+        <p className="text-sm text-muted-foreground break-all">
+          {selectedFileName || 'Nenhum MP4 selecionado'}
+        </p>
+      </div>
 
-        <Textarea
-          id="transcription_prompt"
-          ref={promptInputRef}
-          value={transcriptionPrompt ?? ''}
-          onChange={handleTranscriptionPromptChange}
-          disabled={status !== 'waiting'}
-          className="h-20 resize-none leading-relaxed"
-          placeholder="Inclua palavras-chave mencionadas no vídeo separadas por vírgula (Ex.: html, css, javascript)"
-        />
-
+      <div className="space-y-2">
+        <Label>Status</Label>
+        <p className="text-sm text-muted-foreground">{statusLabel}</p>
+        {errorMessage && (
+          <p className="text-sm text-destructive">{errorMessage}</p>
+        )}
       </div>
 
       <Button
         type="submit"
-        disabled={status !== 'waiting'}
-        data-success={status === 'success'}
+        disabled={!canUpload}
+        data-success={status === 'completed'}
         className="w-full data-[success=true]:bg-emerald-400"
       >
-        {status === 'waiting' ? (
-          <>
-            Carregar vídeo
-            <Upload className="w-4 h-4 ml-2" />
-          </>
-        ) : statusMessages[status]}
+        {status === 'waiting' || status === 'failed' ? 'Enviar MP4' : statusLabel}
+        <Upload className="w-4 h-4 ml-2" />
       </Button>
     </form>
   );

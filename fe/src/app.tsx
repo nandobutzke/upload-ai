@@ -1,37 +1,30 @@
-import { useState } from 'react';
-import { Button } from './components/shadcn/ui/Button';
 import { Github, Wand2 } from 'lucide-react';
+import { Button } from './components/shadcn/ui/Button';
 import { Separator } from './components/shadcn/ui/Separator';
 import { Textarea } from "./components/shadcn/ui/Textarea";
 import { Label } from "./components/shadcn/ui/Label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/shadcn/ui/Select";
-import { Slider } from "./components/shadcn/ui/Slider";
 import VideoInputForm from "./components/VideoInputForm";
-import PromptSelect from "./components/PromptSelect";
-import { useCompletion } from 'ai/react';
-import { UploadFileProvider } from "./hooks/useUploadFile";
+import useUploadFile, { UploadFileProvider } from "./hooks/useUploadFile";
 
 export function App() {
-  const [videoId, setVideoId] = useState<string>('');
-  const [temperature, setTemperature] = useState(0.5);
+  return (
+    <UploadFileProvider>
+      <Workspace />
+    </UploadFileProvider>
+  );
+}
 
+function Workspace() {
   const {
-    input,
-    setInput,
-    handleInputChange,
-    handleSubmit,
-    completion,
-    isLoading
-  } = useCompletion({
-    api: 'http://localhost:3333/ai/complete',
-    body: {
-      videoId,
-      temperature,
-    },
-    headers: {
-      'Content-type': 'application/json'
-    }
-  })
+    transcription,
+    title,
+    description,
+    hasGeneration,
+    statusLabel,
+    canGenerate,
+    isGenerating,
+    handleGenerate,
+  } = useUploadFile();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -52,78 +45,57 @@ export function App() {
 
       <main className="flex-1 p-6 flex gap-6">
         <div className="flex flex-col flex-1 gap-4">
-          <div className="grid grid-rows-2 gap-4 flex-1">
+          <div className="space-y-2 flex-1 flex flex-col">
+            <Label htmlFor="transcription">Transcrição</Label>
             <Textarea
-              className="resize-none p-4 leading-relaxed"
-              placeholder="Inclua o prompt para a IA..."
-              value={input}
-              onChange={handleInputChange}
-            />
-            <Textarea
-              className="resize-none p-4 leading-relaxed"
-              placeholder="Resultado gerado pela IA..."
+              id="transcription"
+              className="resize-none p-4 leading-relaxed flex-1 min-h-[240px]"
+              placeholder="A transcrição aparece aqui quando o processamento terminar."
               readOnly
-              value={completion}
+              value={transcription}
             />
           </div>
 
-          <p className="text-muted-foreground">
-            Lembre-se: você pode utilizar a variável <code className="text-violet-400">{'{transcription}'}</code> no seu prompt para adicionar o conteúdo da transcrição do vídeo selecionado.
+          <p className="text-sm text-muted-foreground">
+            Status: {statusLabel}. O botão de gerar libera quando a transcrição fica concluída.
           </p>
+
+          <Button
+            type="button"
+            onClick={handleGenerate}
+            disabled={!canGenerate}
+            className="w-fit"
+          >
+            {isGenerating ? 'Gerando...' : 'Gerar título e descrição'}
+            <Wand2 className="w-4 h-4 ml-2" />
+          </Button>
+
+          {hasGeneration && (
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Título</Label>
+                <Textarea
+                  id="title"
+                  readOnly
+                  value={title}
+                  className="resize-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Descrição</Label>
+                <Textarea
+                  id="description"
+                  readOnly
+                  value={description}
+                  className="min-h-[120px] resize-none"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <aside className="w-80 space-y-6">
-
-          <UploadFileProvider onVideoUploaded={setVideoId}>
-            <VideoInputForm />
-          </UploadFileProvider>
-
-          <Separator />
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label>Prompt</Label>
-              <PromptSelect onPromptSelected={setInput} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Modelo</Label>
-              <Select disabled defaultValue="gpt3.5">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gpt3.5">GPT-3.5-turbo 16k</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="block text-xs italic text-muted-foreground">Você poderá customizar essa opção em breve.</span>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <Label>Temperatura</Label>
-              <Slider
-                min={0}
-                max={1}
-                step={0.1}
-                value={[temperature]}
-                onValueChange={value => setTemperature(value[0])}
-              />
-              <span className="block text-sm italic text-muted-foreground leading-relaxed">
-                Valores mais altos tendem a deixar o resultado mais criativo e com possíveis erros.
-              </span>
-
-            </div>
-
-            <Separator />
-
-            <Button disabled={isLoading} className="w-full">
-              Executar
-              <Wand2 className="w-4 h-4 ml-2" />
-            </Button>
-
-          </form>
+          <VideoInputForm />
         </aside>
       </main>
     </div>
